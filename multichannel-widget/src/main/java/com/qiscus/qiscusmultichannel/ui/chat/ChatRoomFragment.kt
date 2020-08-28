@@ -1,8 +1,10 @@
 package com.qiscus.qiscusmultichannel.ui.chat
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.*
+import android.graphics.PorterDuff
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -11,6 +13,7 @@ import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.LinearLayout
 import androidx.annotation.NonNull
 import androidx.core.content.ContextCompat
@@ -30,18 +33,21 @@ import com.qiscus.qiscusmultichannel.ui.loading.LoadingActivity
 import com.qiscus.qiscusmultichannel.ui.view.QiscusChatScrollListener
 import com.qiscus.qiscusmultichannel.ui.webView.WebViewHelper
 import com.qiscus.qiscusmultichannel.util.*
-import com.qiscus.sdk.chat.core.custom.QiscusCore
-import com.qiscus.sdk.chat.core.custom.data.local.QiscusCacheManager
-import com.qiscus.sdk.chat.core.custom.data.model.QiscusChatRoom
-import com.qiscus.sdk.chat.core.custom.data.model.QiscusComment
-import com.qiscus.sdk.chat.core.custom.data.model.QiscusPhoto
-import com.qiscus.sdk.chat.core.custom.data.remote.QiscusPusherApi
-import com.qiscus.sdk.chat.core.custom.util.QiscusFileUtil
+import com.qiscus.sdk.chat.core.QiscusCore
+import com.qiscus.sdk.chat.core.data.local.QiscusCacheManager
+import com.qiscus.sdk.chat.core.data.model.QiscusChatRoom
+import com.qiscus.sdk.chat.core.data.model.QiscusComment
+import com.qiscus.sdk.chat.core.data.model.QiscusComment.Type.*
+import com.qiscus.sdk.chat.core.data.model.QiscusPhoto
+import com.qiscus.sdk.chat.core.data.remote.QiscusPusherApi
+import com.qiscus.sdk.chat.core.util.QiscusAndroidUtil
+import com.qiscus.sdk.chat.core.util.QiscusFileUtil
 import kotlinx.android.synthetic.*
 import kotlinx.android.synthetic.main.fragment_chat_room_mc.*
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
+import java.util.*
 
 /**
  * Created on : 16/08/19
@@ -49,7 +55,8 @@ import java.io.IOException
  * GitHub     : https://github.com/tfkbudi
  */
 class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
-    ChatRoomPresenter.ChatRoomView, QiscusPermissionsUtil.PermissionCallbacks {
+    ChatRoomPresenter.ChatRoomView, QiscusPermissionsUtil.PermissionCallbacks,
+    DialogDeleteMessage.OnDeleteSelectedMessage {
 
     private val CAMERA_PERMISSION = arrayOf(
         "android.permission.CAMERA",
@@ -73,17 +80,21 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
     private var commentSelectedListener: CommentSelectedListener? = null
     private var userTypingListener: OnUserTypingListener? = null
     private var selectedComment: QiscusComment? = null
+    private lateinit var layoutManager: LinearLayoutManager
     private lateinit var rvMessage: RecyclerView
+    private var newMessageUnread: ArrayList<QiscusComment> = ArrayList()
     private var isTyping = false
+    private var isSessional = false
 
     companion object {
         const val CHATROOM_KEY = "chatroom_key"
+        const val SESSIONA_KEY = "session_key"
 
-
-        fun newInstance(qiscusChatRoom: QiscusChatRoom): ChatRoomFragment {
+        fun newInstance(qiscusChatRoom: QiscusChatRoom, isSessional: Boolean): ChatRoomFragment {
             val chatRoomFragment = ChatRoomFragment()
             val bundle = Bundle()
             bundle.putParcelable(CHATROOM_KEY, qiscusChatRoom)
+            bundle.putBoolean(SESSIONA_KEY, isSessional)
             chatRoomFragment.arguments = bundle
             return chatRoomFragment
         }
@@ -105,38 +116,56 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
 
         arguments?.let {
             qiscusChatRoom = it.getParcelable(CHATROOM_KEY)
+            isSessional = it.getBoolean(SESSIONA_KEY)
         }
 
         if (qiscusChatRoom == null) {
             throw RuntimeException("please provide qiscus chat room")
         }
 
-        btnSend.setOnClickListener { sendingComment() }
+        setViewEnabled(btnSend, false)
+        changeImageSendTint(btnSend, R.color.qiscus_grey_mc)
+
+        btnSend.setOnClickListener {
+            tvFirstIndicator.visibility = View.GONE
+            sendingComment()
+        }
+
         btn_new_room.setOnClickListener {
-            val account = QiscusCore.getQiscusAccount()
-            QiscusChatLocal.setRoomId(0)
-            LoadingActivity.generateIntent(
-                ctx,
-                account.username,
-                QiscusChatLocal.getUserId(),
-                QiscusChatLocal.getAvatar(),
-                QiscusChatLocal.getExtras(),
-                QiscusChatLocal.getUserProps()
-            )
-            activity?.finish()
+            generateNewChatRoom()
+        }
+        btn_new_message.setOnClickListener {
+            rvMessage.smoothScrollToPosition(0)
+            showNewMessageButton(null)
         }
         btnCancelReply.setOnClickListener { rootViewSender.visibility = View.GONE }
+
         qiscusChatRoom?.let {
             presenter = ChatRoomPresenter(it)
             presenter.attachView(this)
             presenter.loadComments(20)
-            showNewChatButton(it.options.getBoolean("is_resolved"))
+
+//            create a new chat room after resolved
+            if (isSessional) {
+                showNewChatButton(it.options.getBoolean("is_resolved"))
+            }
         }
+
         btnAttachmentOptions.setOnClickListener { showAttachmentDialog() }
-        btnAttachmentCamera.setOnClickListener { selectImage() }
-        btnAttachmentDoc.setOnClickListener { openFile() }
+
         etMessage.afterTextChangedDelayed({
             notifyServerTyping(true)
+        }, {
+            when {
+                it.isNotEmpty() -> {
+                    setViewEnabled(btnSend, true)
+                    changeImageSendTint(btnSend, R.color.colorPrimary)
+                }
+                else -> {
+                    setViewEnabled(btnSend, false)
+                    changeImageSendTint(btnSend, R.color.qiscus_grey_mc)
+                }
+            }
         }, {
             notifyServerTyping(false)
         })
@@ -176,8 +205,9 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
     }
 
     private fun initRecyclerMessage() {
-        val layoutManager = LinearLayoutManager(ctx)
+        layoutManager = LinearLayoutManager(ctx)
         layoutManager.reverseLayout = true
+        layoutManager.stackFromEnd = true
         rvMessage.layoutManager = layoutManager
         rvMessage.setHasFixedSize(true)
         rvMessage.addOnScrollListener(QiscusChatScrollListener(layoutManager, this))
@@ -198,17 +228,35 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
     }
 
     private fun handleItemClick(comment: QiscusComment) {
-        clearSelectedComment()
-        when (comment.type) {
-            QiscusComment.Type.FILE -> {
-                val obj = JSONObject(comment.extraPayload)
-                val url = obj.getString("url")
-                val fileName = obj.getString("file_name")
-                presenter.downloadFile(comment, url, fileName)
-            }
-            else -> {
+        if (!comment.isSelected) {
+            when (comment.type) {
+                FILE -> {
+                    val obj = JSONObject(comment.extraPayload)
+                    val url = obj.getString("url")
+                    val fileName = obj.getString("file_name")
+                    presenter.downloadFile(comment, url, fileName)
+                }
+                REPLY -> {
+                    val position: Int = commentsAdapter.findPosition(comment.replyTo)
+                    if (position >= 0) {
+                        rvMessage.scrollToPosition(position)
+                        highlightComment(commentsAdapter.data[position])
+                    }
+                }
+                else -> {
+                    // do nothing
+                }
             }
         }
+        clearSelectedComment()
+    }
+
+    private fun highlightComment(comment: QiscusComment) {
+        comment.isSelected = true
+        commentsAdapter.addOrUpdate(comment)
+        commentsAdapter.setSelectedComment(comment)
+
+        QiscusAndroidUtil.runOnUIThread({ clearSelectedComment() }, 2000)
     }
 
     private fun sendingComment() {
@@ -246,7 +294,7 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
                             MediaStore.EXTRA_OUTPUT,
                             FileProvider.getUriForFile(
                                 ctx,
-                                getAuthority(),
+                                QiscusCore.getApps().packageName,
                                 photoFile
                             )
                         )
@@ -262,7 +310,11 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
 
     private fun pickImage() {
         val intent = Intent(Intent.ACTION_GET_CONTENT)
-        intent.type = "image/*"
+//        intent.type = "image/*"
+        intent.type = "*/*"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            intent.putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "video/*"))
+        }
         startActivityForResult(intent, IMAGE_GALLERY_REQUEST)
     }
 
@@ -309,14 +361,21 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
     private fun bindReplyView(origin: QiscusComment) {
         originSender.text = origin.sender
         when (origin.type) {
-            QiscusComment.Type.IMAGE -> {
+            IMAGE -> {
                 originImage.visibility = View.VISIBLE
                 Nirmana.getInstance().get()
                     .load(origin.attachmentUri)
                     .into(originImage)
                 originContent.text = origin.caption
             }
-            QiscusComment.Type.FILE -> {
+            VIDEO -> {
+                originImage.visibility = View.VISIBLE
+                Nirmana.getInstance().get()
+                    .load(origin.attachmentUri)
+                    .into(originImage)
+                originContent.text = origin.caption
+            }
+            FILE -> {
                 originContent.text = origin.attachmentName
                 originImage.visibility = View.GONE
             }
@@ -328,7 +387,9 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
     }
 
     fun toggleSelectedComment(comment: QiscusComment) {
-        if (comment.type != QiscusComment.Type.SYSTEM_EVENT || comment.type != QiscusComment.Type.CARD) {
+        if (comment.type != SYSTEM_EVENT && comment.type != BUTTONS
+            && comment.type != CARD && comment.type != CAROUSEL
+        ) {
             comment.isSelected = true
             commentsAdapter.addOrUpdate(comment)
             commentsAdapter.setSelectedComment(comment)
@@ -341,16 +402,13 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
         commentsAdapter.clearSelected()
     }
 
-    fun sendComment(message: String) {
+    private fun sendComment(message: String) {
         clearSelectedComment()
         presenter.sendComment(message)
     }
 
     fun deleteComment() {
-        clearSelectedComment()
-        commentsAdapter.getSelectedComment()?.let {
-            showDialogDeleteComment(it)
-        }
+        activity?.let { DialogDeleteMessage(it, this).show() }
     }
 
     fun replyComment() {
@@ -364,9 +422,9 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
         clearSelectedComment()
         commentsAdapter.getSelectedComment()?.let {
             val textCopied = when (it.type) {
-                QiscusComment.Type.FILE -> it.attachmentName
-                QiscusComment.Type.IMAGE -> it.caption
-                QiscusComment.Type.CARD -> {
+                FILE -> it.attachmentName
+                IMAGE -> it.caption
+                CARD -> {
                     val title = JSONObject(it.extraPayload).getString("title")
                     val description = JSONObject(it.extraPayload).getString("description")
                     title + "\n" + description
@@ -385,34 +443,16 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
 
     }
 
-    private fun showDialogDeleteComment(qiscusComment: QiscusComment) {
-        val alertDialogBuilder = AlertDialog.Builder(ctx)
-        alertDialogBuilder.setTitle(R.string.qiscus_delete_message_title)
-
-        alertDialogBuilder
-            .setMessage(R.string.qiscus_delete_message)
-            .setCancelable(false)
-            .setPositiveButton(R.string.qiscus_delete) { dialog, p ->
-                presenter.deleteComment(qiscusComment)
-                dialog.dismiss()
-            }
-            .setNegativeButton(R.string.qiscus_cancel) { dialog, p ->
-                dialog.dismiss()
-            }
-
-        alertDialogBuilder.create().show()
-    }
-
     override fun onTopOffListMessage() {
         loadMoreComments()
     }
 
     override fun onMiddleOffListMessage() {
-
     }
 
     override fun onBottomOffListMessage() {
-
+        newMessageUnread.clear()
+        newMessagePanel.visibility = View.GONE
     }
 
     private fun loadMoreComments() {
@@ -427,6 +467,9 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
     override fun initRoomData(comments: List<QiscusComment>, qiscusChatRoom: QiscusChatRoom) {
         this.qiscusChatRoom = qiscusChatRoom
         commentsAdapter.addOrUpdate(comments)
+        tvFirstIndicator.visibility =
+            if (commentsAdapter.data.size() > 0) View.GONE else View.VISIBLE
+        rvMessage.scrollToPosition(0)
     }
 
     override fun onLoadMoreComments(comments: List<QiscusComment>) {
@@ -435,6 +478,7 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
 
     override fun onSuccessSendComment(comment: QiscusComment) {
         commentsAdapter.addOrUpdate(comment)
+        rvMessage.smoothScrollToPosition(0)
     }
 
     override fun onFailedSendComment(comment: QiscusComment) {
@@ -442,10 +486,12 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
     }
 
     override fun onNewComment(comment: QiscusComment) {
+        tvFirstIndicator.visibility = View.GONE
         commentsAdapter.addOrUpdate(comment)
         if ((rvMessage.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition() <= 2) {
             rvMessage.smoothScrollToPosition(0)
         }
+        showNewMessageButton(comment)
     }
 
     override fun showLoading() {
@@ -490,7 +536,7 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
             intent.setDataAndType(
                 FileProvider.getUriForFile(
                     ctx,
-                    getAuthority(),
+                    QiscusCore.getApps().packageName,
                     file
                 ), mimeType
             )
@@ -507,17 +553,51 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
 
     override fun showNewChatButton(it: Boolean) {
         if (it) {
-            newChatPanel.visibility = View.VISIBLE
-            messageInputPanel.visibility = View.GONE
+            MultichannelWidget.instance.component.chatroomRepository.getSession(
+                QiscusCore.getAppId(),
+                {
+                    isSessional = it
+                    if (it) {
+                        newChatPanel.visibility = View.VISIBLE
+                        messageInputPanel.visibility = View.GONE
+                    } else {
+                        newChatPanel.visibility = View.GONE
+                        messageInputPanel.visibility = View.VISIBLE
+                    }
+                }) { error(it) }
+
         } else {
             newChatPanel.visibility = View.GONE
             messageInputPanel.visibility = View.VISIBLE
         }
     }
 
+    @SuppressLint("SetTextI18n")
+    private fun showNewMessageButton(comment: QiscusComment?) {
+        comment?.let {
+            var isAdd = true
+            if (it.isMyComment) {
+                rvMessage.smoothScrollToPosition(0)
+                isAdd = false
+            } else {
+                for (commentUnread in newMessageUnread)
+                    if (commentUnread.id == it.id) isAdd = false
+            }
+            if (isAdd) newMessageUnread.add(it)
+        }
+
+        val count = newMessageUnread.size
+        if (count > 0 && layoutManager.findFirstVisibleItemPosition() > 1) {
+            btn_new_message.text = "$count New Message"
+            newMessagePanel.visibility = View.VISIBLE
+        } else {
+            newMessagePanel.visibility = View.GONE
+        }
+    }
+
     override fun refreshComments() {
         dismissLoading()
-        MultichannelWidget.instance.openChatRoomMultichannel(clearTaskActivity = false)
+        MultichannelWidget.instance.openChatRoomMultichannel()
         activity?.finish()
     }
 
@@ -620,6 +700,7 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
         )
     }
 
+    @SuppressLint("InflateParams")
     private fun showAttachmentDialog() {
         val dialogView = layoutInflater.inflate(R.layout.bottom_sheet_attachment_mc, null)
         val dialog = BottomSheetDialog(ctx, R.style.AppBottomSheetDialogTheme)
@@ -653,14 +734,12 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
             "Take Photo", "Choose from Library",
             "Cancel"
         )
-        builder.setItems(items, object : DialogInterface.OnClickListener {
-            override fun onClick(dialog: DialogInterface?, which: Int) {
-                when (which) {
-                    0 -> openCamera()
-                    1 -> openGallery()
-                }
+        builder.setItems(items) { _, which ->
+            when (which) {
+                0 -> openCamera()
+                1 -> openGallery()
             }
-        })
+        }
         builder.show()
     }
 
@@ -679,6 +758,40 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
         clearFindViewByIdCache()
     }
 
+    private fun setViewEnabled(view: View, enabled: Boolean) {
+        view.isEnabled = enabled
+        view.isClickable = enabled
+        view.isFocusable = enabled
+    }
+
+    private fun changeImageSendTint(imageView: ImageView, color: Int) {
+        activity?.let {
+            ContextCompat.getColor(it, color)
+        }?.let {
+            imageView.setColorFilter(it, PorterDuff.Mode.SRC_ATOP)
+        }
+    }
+
+    override fun onDeleteMessage() {
+        clearSelectedComment()
+        commentsAdapter.getSelectedComment()?.let {
+            presenter.deleteComment(it)
+        }
+    }
+
+    private fun generateNewChatRoom() {
+        val account = QiscusCore.getQiscusAccount()
+        QiscusChatLocal.setRoomId(0)
+        LoadingActivity.generateIntent(
+            ctx,
+            account.username,
+            QiscusChatLocal.getUserId(),
+            QiscusChatLocal.getAvatar(),
+            QiscusChatLocal.getExtras(),
+            QiscusChatLocal.getUserProps()
+        )
+        activity?.finish()
+    }
 
     interface CommentSelectedListener {
         fun onCommentSelected(selectedComment: QiscusComment)

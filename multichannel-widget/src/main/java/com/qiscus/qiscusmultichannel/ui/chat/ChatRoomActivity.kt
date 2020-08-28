@@ -3,21 +3,23 @@ package com.qiscus.qiscusmultichannel.ui.chat
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import com.bumptech.glide.request.RequestOptions
 import com.qiscus.nirmana.Nirmana
 import com.qiscus.qiscusmultichannel.MultichannelWidget
-import com.qiscus.qiscusmultichannel.MultichannelWidgetConfig
 import com.qiscus.qiscusmultichannel.R
-import com.qiscus.sdk.chat.core.custom.data.model.QiscusChatRoom
-import com.qiscus.sdk.chat.core.custom.data.model.QiscusComment
-import com.qiscus.sdk.chat.core.custom.data.remote.QiscusApi
-import com.qiscus.sdk.chat.core.custom.data.remote.QiscusPusherApi
-import com.qiscus.sdk.chat.core.custom.event.QiscusCommentReceivedEvent
-import com.qiscus.sdk.chat.core.custom.event.QiscusUserStatusEvent
-import com.qiscus.sdk.chat.core.custom.util.QiscusDateUtil
+import com.qiscus.sdk.chat.core.QiscusCore
+import com.qiscus.sdk.chat.core.data.model.QiscusChatRoom
+import com.qiscus.sdk.chat.core.data.model.QiscusComment
+import com.qiscus.sdk.chat.core.data.model.QiscusComment.Type
+import com.qiscus.sdk.chat.core.data.model.QiscusComment.Type.*
+import com.qiscus.sdk.chat.core.data.remote.QiscusApi
+import com.qiscus.sdk.chat.core.data.remote.QiscusPusherApi
+import com.qiscus.sdk.chat.core.event.QiscusCommentReceivedEvent
+import com.qiscus.sdk.chat.core.event.QiscusUserStatusEvent
+import com.qiscus.sdk.chat.core.util.QiscusAndroidUtil
+import com.qiscus.sdk.chat.core.util.QiscusDateUtil
 import kotlinx.android.synthetic.*
 import kotlinx.android.synthetic.main.activity_chat_room_mc.*
 import kotlinx.android.synthetic.main.toolbar_menu_selected_comment_mc.*
@@ -33,11 +35,10 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
     lateinit var qiscusChatRoom: QiscusChatRoom
     private val users: MutableSet<String> = HashSet()
     private var memberList: String = ""
-    private  var runnable =  Runnable{
-        tvSubtitle?.text = MultichannelWidget.config.getRoomSubtitle() ?: memberList
-    }
-    private var handler = Handler(Looper.getMainLooper())
+    private var isSessional = false
+
     companion object {
+        var IS_ACTIVE = false
         val CHATROOM_KEY = "chatroom_key"
 
         fun generateIntent(
@@ -46,8 +47,10 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
         ): Intent {
 
             val intent = Intent(context, ChatRoomActivity::class.java)
-            //intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+//            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
             intent.putExtra(CHATROOM_KEY, qiscusChatRoom)
+            context.startActivity(intent)
             return intent
         }
     }
@@ -70,13 +73,19 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
 
         btn_back.setOnClickListener { finish() }
 
-        supportFragmentManager.beginTransaction()
-            .replace(
-                R.id.fragmentContainer,
-                ChatRoomFragment.newInstance(qiscusChatRoom),
-                ChatRoomFragment::class.java.name
-            )
-            .commit()
+        MultichannelWidget.instance.component.chatroomRepository.getSession(
+            QiscusCore.getAppId(),
+            {
+                isSessional = it
+                supportFragmentManager.beginTransaction()
+                    .replace(
+                        R.id.fragmentContainer,
+                        ChatRoomFragment.newInstance(qiscusChatRoom, it),
+                        ChatRoomFragment::class.java.name
+                    )
+                    .commit()
+            }) { error(it) }
+
 
         if (!EventBus.getDefault().isRegistered(this)) {
             EventBus.getDefault().register(this)
@@ -84,19 +93,15 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
         btn_action_copy.setOnClickListener { getChatFragment().copyComment() }
         btn_action_delete.setOnClickListener { getChatFragment().deleteComment() }
         btn_action_reply.setOnClickListener { getChatFragment().replyComment() }
-        btn_action_reply_cancel.setOnClickListener { getChatFragment().clearSelectedComment() }
+        btn_action_reply_cancle.setOnClickListener { getChatFragment().clearSelectedComment() }
         setBarInfo()
 
-        tvTitle.text = MultichannelWidget.config.getRoomTitle() ?: qiscusChatRoom.name
-
-        val avatar = MultichannelWidget.config.getHardcodedAvatar() ?: qiscusChatRoom.avatarUrl
-        Nirmana.getInstance().get()
-            .load(getAvatar())
-            .into(ivAvatar)
+//        tvTitle.text = qiscusChatRoom.name
     }
 
     override fun onResume() {
         super.onResume()
+        IS_ACTIVE = true
         bindRoomData()
     }
 
@@ -105,12 +110,25 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
     }
 
     override fun onCommentSelected(selectedComment: QiscusComment) {
-        if (toolbar_selected_comment.visibility == View.VISIBLE) {
+        if (toolbar_selected_comment.visibility == View.VISIBLE
+            || (qiscusChatRoom.options.optBoolean("is_resolved")
+                    && isSessional)
+        ) {
             toolbar_selected_comment.visibility = View.GONE
             getChatFragment().clearSelectedComment()
         } else {
             btn_action_delete.visibility =
                 if (selectedComment.isMyComment) View.VISIBLE else View.GONE
+
+            val caption = selectedComment.caption != ""
+            btn_action_copy.visibility = when {
+                selectedComment.type == TEXT || selectedComment.type == REPLY -> View.VISIBLE
+                selectedComment.type == FILE && caption -> View.VISIBLE
+                selectedComment.type == IMAGE && caption -> View.VISIBLE
+                selectedComment.type == VIDEO && caption -> View.VISIBLE
+                else -> View.GONE
+            }
+
             toolbar_selected_comment.visibility = View.VISIBLE
         }
     }
@@ -120,15 +138,34 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
     }
 
     override fun onUserTyping(email: String?, isTyping: Boolean) {
-        tvSubtitle?.text = if (isTyping) "typing..." else getSubtitle()
-
-        if (isTyping) {
-            handler.removeCallbacks(runnable)
-            handler.postDelayed(runnable, 5000)
+        tvMemberList?.let {
+            it.text = if (isTyping) {
+                QiscusAndroidUtil.runOnUIThread({ it.text = memberList }, 5000)
+                "typing..."
+            } else {
+                memberList
+            }
         }
     }
 
     private fun bindRoomData() {
+        MultichannelWidget.instance.component.chatroomRepository.getChatWidgetConfig(
+            QiscusCore.getAppId(),
+            {
+                Nirmana.getInstance().get()
+                    .load(it.customerServiceAvatar)
+                    .apply(
+                        RequestOptions()
+                            .dontAnimate()
+                            .placeholder(R.drawable.ic_default_avatar)
+                            .error(R.drawable.ic_default_avatar)
+                    )
+                    .into(avatar)
+
+                tvTitle.text = it.customerServiceName
+            }, { error(it) }
+        )
+
         for (member in qiscusChatRoom.member) {
             if (member.email != MultichannelWidget.instance.getQiscusAccount().email) {
                 users.add(member.email)
@@ -147,7 +184,7 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
                     listMember.add(it.username)
                 }
                 this.memberList = listMember.joinToString()
-                tvSubtitle.text = getSubtitle()
+                tvMemberList.text = memberList
             }
     }
 
@@ -162,24 +199,14 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
     @Subscribe
     fun onMessageReceived(event: QiscusCommentReceivedEvent) {
         when (event.qiscusComment.type) {
-            QiscusComment.Type.SYSTEM_EVENT -> setBarInfo()
+            Type.SYSTEM_EVENT -> setBarInfo()
         }
 
     }
 
-    fun getSubtitle(): String {
-        return MultichannelWidget.config.getRoomSubtitle() ?: memberList
-    }
-
-    fun getAvatar(): String {
-        for (member in qiscusChatRoom.member) {
-            val type = member.extras.getString("type")
-            if (type.isNotEmpty() && type == "agent"){
-                return member.avatar
-            }
-        }
-
-        return MultichannelWidgetConfig.getHardcodedAvatar() ?: qiscusChatRoom.avatarUrl
+    override fun onStop() {
+        super.onStop()
+        IS_ACTIVE = false
     }
 
     override fun onDestroy() {
@@ -189,5 +216,25 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
         }
         EventBus.getDefault().unregister(this)
         clearFindViewByIdCache()
+    }
+
+    @Subscribe
+    fun onCommentReceivedEvent(event: QiscusCommentReceivedEvent) {
+        if (event.qiscusComment.roomId == qiscusChatRoom.id) {
+            if (event.qiscusComment.type == SYSTEM_EVENT) {
+                QiscusApi.getInstance().getChatRoomInfo(qiscusChatRoom.id)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe { chatRoom ->
+                        chatRoom.options.getBoolean("is_resolved").let {
+                            MultichannelWidget.instance.component.chatroomRepository.getSession(
+                                QiscusCore.getAppId(),
+                                {
+                                    isSessional = it
+                                }) { error(it) }
+                        }
+                    }
+            }
+        }
     }
 }

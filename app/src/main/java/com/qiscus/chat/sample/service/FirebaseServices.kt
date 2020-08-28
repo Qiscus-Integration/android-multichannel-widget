@@ -1,4 +1,4 @@
-package com.qiscus.integrations.multichannel_sample.service
+package com.qiscus.chat.sample.service
 
 import android.util.Log
 import com.google.firebase.messaging.FirebaseMessagingService

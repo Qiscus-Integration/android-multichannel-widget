@@ -5,5 +5,4 @@ package com.qiscus.qiscusmultichannel.data.repository
  * Author     : Taufik Budi S
  * GitHub     : https://github.com/tfkbudi
  */
-interface ChatroomRepository {
-}
+interface ChatroomRepository

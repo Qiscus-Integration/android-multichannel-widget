@@ -1,6 +1,8 @@
 package com.qiscus.qiscusmultichannel.data.repository
 
+import com.google.gson.JsonObject
 import com.qiscus.qiscusmultichannel.data.model.DataInitialChat
+import com.qiscus.qiscusmultichannel.data.model.widgetChatConfig.ChatConfig
 import com.qiscus.qiscusmultichannel.data.repository.response.ResponseInitiateChat
 import retrofit2.Call
 import retrofit2.Callback
@@ -36,4 +38,60 @@ class QiscusChatRepository(val api: QiscusChatApi.Api) {
             }
         })
     }
+
+    fun getSession(
+        appCode: String,
+        onSuccess: (Boolean) -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        api.getSession(appCode).enqueue(object : Callback<JsonObject?> {
+            override fun onFailure(call: Call<JsonObject?>, t: Throwable) {
+                onError(t)
+            }
+
+            override fun onResponse(call: Call<JsonObject?>, response: Response<JsonObject?>) {
+                if (response.isSuccessful) {
+                    var isSessional = false
+                    val result = response.body()?.getAsJsonObject("data")?.let {
+                        isSessional = it.get("is_sessional").asBoolean
+                    }
+                    result?.let {
+                        onSuccess(isSessional)
+                    }
+
+                } else {
+                    onError(Throwable("Error get data from api"))
+                }
+            }
+
+        })
+    }
+
+    fun getWidgetChatConfig(
+        appCode: String,
+        onSuccess: (ChatConfig) -> Unit,
+        onError: (Throwable) -> Unit
+    ) {
+        api.getChatConfig(appCode).enqueue(object : Callback<JsonObject?> {
+            override fun onFailure(call: Call<JsonObject?>, t: Throwable) {
+                onError(t)
+            }
+
+            override fun onResponse(call: Call<JsonObject?>, response: Response<JsonObject?>) {
+                val data = response.body()?.getAsJsonObject("data")?.getAsJsonObject("widget")
+                    ?.getAsJsonObject("variables")
+
+                data?.let {
+                    onSuccess(
+                        ChatConfig(
+                            it.get("customerServiceName").asString,
+                            it.get("customerServiceAvatar").asString
+                        )
+                    )
+                }
+            }
+        })
+    }
+
+
 }

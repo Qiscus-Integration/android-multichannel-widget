@@ -12,7 +12,7 @@ import com.bumptech.glide.request.RequestOptions
 import com.qiscus.nirmana.Nirmana
 import com.qiscus.qiscusmultichannel.R
 import com.qiscus.qiscusmultichannel.util.DateUtil
-import com.qiscus.sdk.chat.core.custom.data.model.QiscusComment
+import com.qiscus.sdk.chat.core.data.model.QiscusComment
 
 /**
  * Created on : 22/08/19
@@ -26,6 +26,7 @@ open class BaseViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
     private val dateOfMessage: TextView? = itemView.findViewById(R.id.dateOfMessage)
     @Nullable
     private val state: ImageView? = itemView.findViewById(R.id.state)
+    private val firstIndicator: TextView? = itemView.findViewById(R.id.tvFirstIndicator)
 
     private val pendingStateColor: Int =
         ContextCompat.getColor(itemView.context, R.color.pending_message_mc)
@@ -38,17 +39,6 @@ open class BaseViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
     var pstn = 0
 
     open fun bind(comment: QiscusComment) {
-        avatar?.let {
-            Nirmana.getInstance().get()
-                .setDefaultRequestOptions(
-                    RequestOptions()
-                        .placeholder(R.drawable.ic_qiscus_avatar)
-                        .error(R.drawable.ic_qiscus_avatar)
-                        .dontAnimate()
-                )
-                .load(comment.senderAvatar)
-                .into(it)
-        }
         sender?.text = comment.sender
         date?.text = DateUtil.getTimeStringFromDate(comment.time)
         dateOfMessage?.text = DateUtil.toFullDate(comment.time)
@@ -63,8 +53,27 @@ open class BaseViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         dateOfMessage?.visibility = if (showDate) View.VISIBLE else View.GONE
     }
 
-    open fun setNeedToShowName(showName: Boolean) {
+    open fun setNeedToShowName(avatarUrl: String?, showName: Boolean) {
         sender?.visibility = if (showName) View.VISIBLE else View.GONE
+        avatar?.visibility = if (showName) View.VISIBLE else View.INVISIBLE
+
+        if (showName) {
+            avatar?.let {
+                Nirmana.getInstance().get()
+                    .setDefaultRequestOptions(
+                        RequestOptions()
+                            .placeholder(R.drawable.ic_qiscus_avatar)
+                            .error(R.drawable.ic_qiscus_avatar)
+                            .dontAnimate()
+                    )
+                    .load(avatarUrl)
+                    .into(it)
+            }
+        }
+    }
+
+    open fun setNeedToShowFirstIndicator(showIndicator: Boolean) {
+        firstIndicator?.visibility = if (showIndicator) View.VISIBLE else View.GONE
     }
 
     private fun renderState(comment: QiscusComment) {

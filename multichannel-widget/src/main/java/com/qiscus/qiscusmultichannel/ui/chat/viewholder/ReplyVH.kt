@@ -12,8 +12,8 @@ import com.bumptech.glide.request.RequestOptions
 import com.qiscus.nirmana.Nirmana
 import com.qiscus.qiscusmultichannel.R
 import com.qiscus.qiscusmultichannel.ui.webView.WebViewHelper
-import com.qiscus.sdk.chat.core.custom.QiscusCore
-import com.qiscus.sdk.chat.core.custom.data.model.QiscusComment
+import com.qiscus.sdk.chat.core.QiscusCore
+import com.qiscus.sdk.chat.core.data.model.QiscusComment
 import kotlinx.android.synthetic.main.item_my_reply_mc.view.*
 import java.util.regex.Matcher
 
@@ -29,8 +29,7 @@ class ReplyVH(itemView: View) : BaseViewHolder(itemView) {
         super.bind(comment)
         val origin = comment.replyTo
 
-        itemView.origin_sender?.text =
-            if (qiscusAccount.email == origin.senderEmail) itemView.context.getString(R.string.qiscus_you_mc) else origin.sender
+        itemView.origin_sender?.text = origin.sender
 
         itemView.origin_comment?.text = origin.message
         itemView.message.text = comment.message
@@ -41,20 +40,8 @@ class ReplyVH(itemView: View) : BaseViewHolder(itemView) {
                 itemView.origin_image.visibility = View.GONE
                 itemView.icon.visibility = View.GONE
             }
-            QiscusComment.Type.IMAGE -> {
-                itemView.origin_image.visibility = View.VISIBLE
-                itemView.icon.setImageResource(R.drawable.ic_qiscus_gallery)
-                itemView.origin_comment.text = if (origin.caption == "") "Image" else origin.caption
-                Nirmana.getInstance().get()
-                    .setDefaultRequestOptions(
-                        RequestOptions()
-                            .placeholder(R.drawable.ic_qiscus_avatar)
-                            .error(R.drawable.ic_qiscus_avatar)
-                            .dontAnimate()
-                    )
-                    .load(origin.attachmentUri)
-                    .into(itemView.origin_image)
-            }
+            QiscusComment.Type.IMAGE -> setPreviewImage(origin)
+            QiscusComment.Type.VIDEO -> setPreviewImage(origin)
             QiscusComment.Type.FILE -> {
                 itemView.origin_image.visibility = View.GONE
                 itemView.icon.visibility = View.VISIBLE
@@ -69,7 +56,27 @@ class ReplyVH(itemView: View) : BaseViewHolder(itemView) {
         }
     }
 
-    @SuppressLint("DefaultLocale")
+    private fun setPreviewImage(origin: QiscusComment) {
+        itemView.origin_image.visibility = View.VISIBLE
+        itemView.icon.setImageResource(R.drawable.ic_qiscus_gallery)
+        itemView.origin_comment.text =
+            if (origin.caption == "")
+                if (origin.type == QiscusComment.Type.IMAGE) "Image" else "Video"
+            else
+                origin.caption
+
+        Nirmana.getInstance().get()
+            .setDefaultRequestOptions(
+                RequestOptions()
+                    .placeholder(R.drawable.ic_qiscus_avatar)
+                    .error(R.drawable.ic_qiscus_avatar)
+                    .dontAnimate()
+            )
+            .load(origin.attachmentUri)
+            .into(itemView.origin_image)
+    }
+
+    @SuppressLint("DefaultLocale", "RestrictedApi")
     private fun setUpLinks() {
         val text = message.text.toString().toLowerCase()
         val matcher: Matcher = PatternsCompat.AUTOLINK_WEB_URL.matcher(text)
@@ -98,7 +105,7 @@ class ReplyVH(itemView: View) : BaseViewHolder(itemView) {
             return
         }
         if (text is Spannable) {
-            (text as Spannable).setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            text.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         } else {
             val s: SpannableString = SpannableString.valueOf(text)
             s.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
@@ -106,7 +113,7 @@ class ReplyVH(itemView: View) : BaseViewHolder(itemView) {
         }
     }
 
-    private class ClickSpan(private val listener: OnClickListener?) :
+    class ClickSpan(private val listener: OnClickListener?) :
         ClickableSpan() {
 
         interface OnClickListener {

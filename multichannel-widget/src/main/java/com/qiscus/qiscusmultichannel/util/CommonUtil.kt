@@ -6,7 +6,7 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.widget.EditText
 import android.widget.Toast
-import com.qiscus.sdk.chat.core.custom.QiscusCore
+import com.qiscus.sdk.chat.core.QiscusCore
 
 /**
  * Created on : 29/08/19
@@ -24,6 +24,7 @@ fun getAuthority(): String {
 
 fun EditText.afterTextChangedDelayed(
     beforeTextChanged: () -> Unit,
+    afterChanged: (String) -> Unit,
     afterTextChanged: (String) -> Unit
 ) {
     this.addTextChangedListener(object : TextWatcher {
@@ -36,6 +37,7 @@ fun EditText.afterTextChangedDelayed(
         override fun onTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {}
 
         override fun afterTextChanged(editable: Editable?) {
+            afterChanged(editable.toString())
             timer?.cancel()
             timer = object : CountDownTimer(3000, 1500) {
                 override fun onTick(millisUntilFinished: Long) {}

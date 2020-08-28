@@ -66,8 +66,8 @@ object QiscusChatLocal {
         return getPref().getString("qm_avatar","") ?: null
     }
 
-    fun clearPreferences() {
-        getEditor().clear().apply()
+    fun clearData() {
+        getEditor().clear()
+        setRoomId(0L)
     }
-
 }

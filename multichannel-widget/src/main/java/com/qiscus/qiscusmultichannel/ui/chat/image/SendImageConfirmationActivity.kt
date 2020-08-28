@@ -9,8 +9,8 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
 import com.qiscus.nirmana.Nirmana
 import com.qiscus.qiscusmultichannel.R
-import com.qiscus.sdk.chat.core.custom.data.model.QiscusChatRoom
-import com.qiscus.sdk.chat.core.custom.data.model.QiscusPhoto
+import com.qiscus.sdk.chat.core.data.model.QiscusChatRoom
+import com.qiscus.sdk.chat.core.data.model.QiscusPhoto
 import kotlinx.android.synthetic.main.activity_send_image_confirmation_mc.*
 
 class SendImageConfirmationActivity : AppCompatActivity() {
@@ -54,7 +54,10 @@ class SendImageConfirmationActivity : AppCompatActivity() {
             return
         }
 
+        initRoomChat()
+
         buttonSend.setOnClickListener { confirm() }
+        btn_back.setOnClickListener { finish() }
     }
 
     private fun initPhotos() {
@@ -77,4 +80,19 @@ class SendImageConfirmationActivity : AppCompatActivity() {
         setResult(Activity.RESULT_OK, data)
         finish()
     }
+
+    private fun initRoomChat() {
+        tvTitle.text = qiscusChatRoom.name
+
+        Nirmana.getInstance().get()
+            .load(qiscusChatRoom.avatarUrl)
+            .apply(
+                RequestOptions()
+                    .dontAnimate()
+                    .placeholder(R.drawable.ic_default_avatar)
+                    .error(R.drawable.ic_default_avatar)
+            )
+            .into(avatar)
+    }
+
 }

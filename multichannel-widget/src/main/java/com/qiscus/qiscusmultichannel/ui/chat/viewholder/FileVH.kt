@@ -13,8 +13,8 @@ import androidx.core.util.PatternsCompat
 import com.qiscus.qiscusmultichannel.R
 import com.qiscus.qiscusmultichannel.ui.view.QiscusProgressView
 import com.qiscus.qiscusmultichannel.ui.webView.WebViewHelper
-import com.qiscus.sdk.chat.core.custom.QiscusCore
-import com.qiscus.sdk.chat.core.custom.data.model.QiscusComment
+import com.qiscus.sdk.chat.core.QiscusCore
+import com.qiscus.sdk.chat.core.data.model.QiscusComment
 import org.json.JSONObject
 import java.util.regex.Matcher
 
@@ -48,7 +48,7 @@ class FileVH(itemView: View) : BaseViewHolder(itemView), QiscusComment.ProgressL
             val url = content.getString("url")
             val tipe = url.split(".")
             tvTitle?.text = title.toString()
-            message?.text = "${tipe[tipe.size - 1].toUpperCase()} File"
+            message?.text = "${tipe[tipe.size - 1].toLowerCase()} File"
         } catch (ex: Exception) {
 
         }
@@ -93,7 +93,7 @@ class FileVH(itemView: View) : BaseViewHolder(itemView), QiscusComment.ProgressL
         }
     }
 
-    @SuppressLint("DefaultLocale")
+    @SuppressLint("DefaultLocale", "RestrictedApi")
     private fun setUpLinks() {
         val text = message?.text.toString().toLowerCase()
         val matcher: Matcher = PatternsCompat.AUTOLINK_WEB_URL.matcher(text)
@@ -122,7 +122,7 @@ class FileVH(itemView: View) : BaseViewHolder(itemView), QiscusComment.ProgressL
             return
         }
         if (text is Spannable) {
-            (text as Spannable).setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            text.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         } else {
             val s: SpannableString = SpannableString.valueOf(text)
             s.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)

@@ -15,7 +15,7 @@ import com.qiscus.nirmana.Nirmana
 import com.qiscus.qiscusmultichannel.MultichannelWidget
 import com.qiscus.qiscusmultichannel.R
 import com.qiscus.qiscusmultichannel.ui.webView.WebViewHelper
-import com.qiscus.sdk.chat.core.custom.data.model.QiscusComment
+import com.qiscus.sdk.chat.core.data.model.QiscusComment
 import kotlinx.android.synthetic.main.item_card_mc.view.*
 import org.json.JSONObject
 import java.util.regex.Matcher
@@ -83,7 +83,7 @@ class CardVH(itemView: View) : BaseViewHolder(itemView) {
             })
     }
 
-    @SuppressLint("DefaultLocale")
+    @SuppressLint("DefaultLocale", "RestrictedApi")
     private fun setUpLinks() {
         val text = itemView.tv_message.text.toString().toLowerCase()
         val matcher: Matcher = PatternsCompat.AUTOLINK_WEB_URL.matcher(text)
@@ -112,7 +112,7 @@ class CardVH(itemView: View) : BaseViewHolder(itemView) {
             return
         }
         if (text is Spannable) {
-            (text as Spannable).setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            text.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         } else {
             val s: SpannableString = SpannableString.valueOf(text)
             s.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)

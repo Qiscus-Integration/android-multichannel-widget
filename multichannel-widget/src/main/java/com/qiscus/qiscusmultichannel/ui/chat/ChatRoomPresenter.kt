@@ -2,19 +2,19 @@ package com.qiscus.qiscusmultichannel.ui.chat
 
 import android.webkit.MimeTypeMap
 import com.qiscus.qiscusmultichannel.R
-import com.qiscus.sdk.chat.core.custom.QiscusCore
-import com.qiscus.sdk.chat.core.custom.data.local.QiscusCacheManager
-import com.qiscus.sdk.chat.core.custom.data.model.*
-import com.qiscus.sdk.chat.core.custom.data.remote.QiscusApi
-import com.qiscus.sdk.chat.core.custom.data.remote.QiscusPusherApi
-import com.qiscus.sdk.chat.core.custom.event.QiscusChatRoomEvent
-import com.qiscus.sdk.chat.core.custom.event.QiscusCommentDeletedEvent
-import com.qiscus.sdk.chat.core.custom.event.QiscusCommentReceivedEvent
-import com.qiscus.sdk.chat.core.custom.event.QiscusMqttStatusEvent
-import com.qiscus.sdk.chat.core.custom.presenter.QiscusChatRoomEventHandler
-import com.qiscus.sdk.chat.core.custom.util.QiscusAndroidUtil
-import com.qiscus.sdk.chat.core.custom.util.QiscusFileUtil
-import com.qiscus.sdk.chat.core.custom.util.QiscusTextUtil
+import com.qiscus.qiscusmultichannel.util.QiscusImageUtil
+import com.qiscus.sdk.chat.core.QiscusCore
+import com.qiscus.sdk.chat.core.data.local.QiscusCacheManager
+import com.qiscus.sdk.chat.core.data.model.*
+import com.qiscus.sdk.chat.core.data.remote.QiscusApi
+import com.qiscus.sdk.chat.core.data.remote.QiscusPusherApi
+import com.qiscus.sdk.chat.core.event.QiscusChatRoomEvent
+import com.qiscus.sdk.chat.core.event.QiscusCommentDeletedEvent
+import com.qiscus.sdk.chat.core.event.QiscusCommentReceivedEvent
+import com.qiscus.sdk.chat.core.presenter.QiscusChatRoomEventHandler
+import com.qiscus.sdk.chat.core.util.QiscusAndroidUtil
+import com.qiscus.sdk.chat.core.util.QiscusFileUtil
+import com.qiscus.sdk.chat.core.util.QiscusTextUtil
 import id.zelory.compressor.Compressor
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
@@ -265,7 +265,11 @@ class ChatRoomPresenter(var room: QiscusChatRoom) : QiscusChatRoomEventHandler.S
         qiscusComment.isDownloading = true
 
         view?.onSendingComment(qiscusComment)
+
         val finalCompressedFile = compressedFile
+        val fileName =
+            finalCompressedFile.path.substring(finalCompressedFile.path.lastIndexOf('/') + 1)
+
         val subscription = QiscusApi.getInstance()
             .upload(compressedFile) { percentage ->
                 qiscusComment.progress = percentage.toInt()
@@ -278,6 +282,10 @@ class ChatRoomPresenter(var room: QiscusChatRoom) : QiscusChatRoomEventHandler.S
                 QiscusApi.getInstance().sendMessage(qiscusComment)
             }
             .doOnNext { commentSend ->
+                if (isAddToGallery(finalCompressedFile.path)) {
+                    QiscusImageUtil.addImageToGallery(finalCompressedFile)
+                }
+                QiscusFileUtil.notifySystem(finalCompressedFile)
                 QiscusCore.getDataStore()
                     .addOrUpdateLocalPath(
                         commentSend.roomId,
@@ -301,6 +309,17 @@ class ChatRoomPresenter(var room: QiscusChatRoom) : QiscusChatRoomEventHandler.S
                     view?.onFailedSendComment(qiscusComment)
                 }
             })
+    }
+
+    private fun isAddToGallery(fileName: String?): Boolean {
+        val type = MimeTypeMap.getSingleton()
+            .getMimeTypeFromExtension(QiscusFileUtil.getExtension(fileName))
+        if (type == null) {
+            return false
+        } else if (type.contains("image") || type.contains("video")) {
+            return true
+        }
+        return false
     }
 
     private fun isValidOlderComments(
@@ -387,7 +406,8 @@ class ChatRoomPresenter(var room: QiscusChatRoom) : QiscusChatRoomEventHandler.S
                     } else if (qiscusComment.type == QiscusComment.Type.FILE || qiscusComment.type == QiscusComment.Type.VIDEO) {
                         view?.onFileDownloaded(
                             file1,
-                            MimeTypeMap.getSingleton().getMimeTypeFromExtension(qiscusComment.extension)
+                            MimeTypeMap.getSingleton()
+                                .getMimeTypeFromExtension(qiscusComment.extension)
                         )
                     }
                 }, { throwable ->
@@ -445,23 +465,12 @@ class ChatRoomPresenter(var room: QiscusChatRoom) : QiscusChatRoomEventHandler.S
     }
 
     @Subscribe
-    public fun onMessageDeleted(event: QiscusCommentDeletedEvent) {
+    fun onMessageDeleted(event: QiscusCommentDeletedEvent) {
         QiscusCore.getDataStore().delete(event.qiscusComment)
         QiscusAndroidUtil.runOnUIThread { view?.onCommentDeleted(event.qiscusComment) }
     }
 
-    @Subscribe
-    fun onMqttEvent(event: QiscusMqttStatusEvent) {
-        if (event === QiscusMqttStatusEvent.CONNECTED){
-            loadComments(20)
-        }
-    }
-
     private fun onGotNewComment(qiscusComment: QiscusComment) {
-        if (!QiscusCore.getDataStore().isContains(qiscusComment)) {
-            QiscusCore.getDataStore().addOrUpdate(qiscusComment)
-        }
-
         if (qiscusComment.senderEmail.equals(qiscusAccount.email, ignoreCase = true)) {
             QiscusAndroidUtil.runOnBackgroundThread { commentSuccess(qiscusComment) }
         } else {
@@ -482,6 +491,8 @@ class ChatRoomPresenter(var room: QiscusChatRoom) : QiscusChatRoomEventHandler.S
             handleIsResolvedMsg(qiscusComment)
 
         }
+
+//        create a new chat room after resolved
         if (qiscusComment.type == QiscusComment.Type.SYSTEM_EVENT) {
 
             if (qiscusComment.message.contains("as resolved")) {
@@ -583,7 +594,9 @@ class ChatRoomPresenter(var room: QiscusChatRoom) : QiscusChatRoomEventHandler.S
         fun onUserTyping(email: String?, isTyping: Boolean)
 
         fun onFileDownloaded(file: File, mimeType: String?)
+
         fun showNewChatButton(it: Boolean)
+
         fun refreshComments()
 
         fun openWebview(url: String)

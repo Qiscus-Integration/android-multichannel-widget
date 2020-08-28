@@ -25,7 +25,7 @@ import android.widget.Scroller;
 
 import androidx.appcompat.widget.AppCompatImageView;
 
-import com.qiscus.sdk.chat.core.custom.util.QiscusLogger;
+import com.qiscus.sdk.chat.core.util.QiscusLogger;
 /*
  * Copyright (c) 2016 Qiscus.
  *
@@ -785,11 +785,8 @@ public class QiscusTouchImageView extends AppCompatImageView {
         } else if (x >= -1 && direction < 0) {
             return false;
 
-        } else if (Math.abs(x) + viewWidth + 1 >= getImageWidth() && direction > 0) {
-            return false;
-        }
+        } else return !(Math.abs(x) + viewWidth + 1 >= getImageWidth()) || direction <= 0;
 
-        return true;
     }
 
     private void scaleImage(double deltaScale, float focusX, float focusY,

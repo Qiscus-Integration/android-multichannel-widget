@@ -10,12 +10,12 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.qiscus.qiscusmultichannel.R
-import com.qiscus.sdk.chat.core.custom.QiscusCore
-import com.qiscus.sdk.chat.core.custom.data.local.QiscusCacheManager
-import com.qiscus.sdk.chat.core.custom.data.model.QiscusComment
-import com.qiscus.sdk.chat.core.custom.util.BuildVersionUtil
-import com.qiscus.sdk.chat.core.custom.util.QiscusAndroidUtil
-import com.qiscus.sdk.chat.core.custom.util.QiscusNumberUtil
+import com.qiscus.sdk.chat.core.QiscusCore
+import com.qiscus.sdk.chat.core.data.local.QiscusCacheManager
+import com.qiscus.sdk.chat.core.data.model.QiscusComment
+import com.qiscus.sdk.chat.core.util.BuildVersionUtil
+import com.qiscus.sdk.chat.core.util.QiscusAndroidUtil
+import com.qiscus.sdk.chat.core.util.QiscusNumberUtil
 import org.json.JSONObject
 
 /**
@@ -26,6 +26,7 @@ import org.json.JSONObject
 class PNUtil {
 
     companion object {
+        @JvmStatic
         fun showPn(context: Context, qiscusComment: QiscusComment) {
             if (QiscusCore.getDataStore().isContains(qiscusComment)) {
                 return
@@ -67,7 +68,6 @@ class PNUtil {
                 .setContentIntent(pendingIntent)
                 .setContentText(getContent(context, qiscusComment))
                 .setTicker(getContent(context, qiscusComment))
-                //@TODO Change background image
                 .setSmallIcon(R.drawable.ic_qiscus_notification_icon)
                 .setColor(ContextCompat.getColor(context, R.color.colorPrimary))
                 .setGroup("CHAT_NOTIF_" + qiscusComment.roomId)
@@ -119,16 +119,6 @@ class PNUtil {
                 } else if (qiscusComment.type == QiscusComment.Type.LOCATION) {
                     return sender + context.getString(
                         R.string.qiscus_send_location_mc,
-                        qiscusComment.sender
-                    )
-                } else if (qiscusComment.type == QiscusComment.Type.FILE) {
-                    return sender + context.getString(
-                        R.string.qiscus_send_file_mc,
-                        qiscusComment.sender
-                    )
-                } else if (qiscusComment.type == QiscusComment.Type.IMAGE) {
-                    return sender + context.getString(
-                        R.string.qiscus_send_image_mc,
                         qiscusComment.sender
                     )
                 }
