@@ -38,12 +38,16 @@ import com.qiscus.sdk.chat.core.data.model.QiscusPhoto
 import com.qiscus.sdk.chat.core.util.QiscusFileUtil
 import com.qiscus.sdk.chat.core.util.QiscusTextUtil
 import id.zelory.compressor.Compressor
-import kotlinx.android.synthetic.*
-import kotlinx.android.synthetic.main.fragment_chat_room_mc.*
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.File
+import androidx.appcompat.widget.AppCompatEditText
+import android.widget.TextView
+import android.widget.ImageView
+import android.widget.ProgressBar
+import android.widget.Button
 import java.io.IOException
+import com.qiscus.qiscusmultichannel.databinding.FragmentChatRoomMcBinding
 
 /**
  * Created on : 16/08/19
@@ -84,6 +88,24 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
     private var selectedComment: QMessage? = null
     private lateinit var rvMessage: RecyclerView
     private var isTyping = false
+    private var _binding: FragmentChatRoomMcBinding? = null
+    private val binding get() = _binding!!
+    
+    // View References
+    private lateinit var btnSend: ImageView
+    private lateinit var btn_new_room: Button
+    private lateinit var btnCancelReply: ImageView
+    private lateinit var btnAttachmentOptions: ImageView
+    private lateinit var btnAttachmentCamera: ImageView
+    private lateinit var btnAttachmentDoc: ImageView
+    private lateinit var etMessage: AppCompatEditText
+    private lateinit var rootViewSender: LinearLayout
+    private lateinit var originSender: TextView
+    private lateinit var originImage: ImageView
+    private lateinit var originContent: TextView
+    private lateinit var progressBar: ProgressBar
+    private lateinit var newChatPanel: LinearLayout
+    private lateinit var messageInputPanel: LinearLayout
 
     companion object {
         const val CHATROOM_KEY = "chatroom_key"
@@ -102,10 +124,24 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        val view = inflater.inflate(R.layout.fragment_chat_room_mc, container, false)
-        rvMessage = view.findViewById(R.id.rvMessage) as RecyclerView
-        return view
+    ): View {
+        _binding = FragmentChatRoomMcBinding.inflate(inflater, container, false)
+        rvMessage = binding.rvMessage
+        btnSend = binding.btnSend
+        btn_new_room = binding.btnNewRoom
+        btnCancelReply = binding.btnCancelReply
+        btnAttachmentOptions = binding.btnAttachmentOptions
+        btnAttachmentCamera = binding.btnAttachmentCamera
+        btnAttachmentDoc = binding.btnAttachmentDoc
+        etMessage = binding.etMessage
+        rootViewSender = binding.rootViewSender
+        originSender = binding.originSender
+        originImage = binding.originImage
+        originContent = binding.originContent
+        progressBar = binding.progressBar
+        newChatPanel = binding.newChatPanel
+        messageInputPanel = binding.messageInputPanel
+        return binding.root
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
@@ -185,6 +221,7 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
         super.onDestroyView()
         notifyLatestRead()
         presenter.detachView()
+        _binding = null
     }
 
     private fun initRecyclerMessage() {
@@ -754,7 +791,6 @@ class ChatRoomFragment : Fragment(), QiscusChatScrollListener.Listener,
         super.onDestroy()
         Const.qiscusCore()?.cacheManager?.setLastChatActivity(false, 0)
         presenter.detachView()
-        clearFindViewByIdCache()
     }
 
 

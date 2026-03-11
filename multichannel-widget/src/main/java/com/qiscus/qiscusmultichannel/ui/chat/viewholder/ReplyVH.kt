@@ -14,7 +14,8 @@ import com.qiscus.qiscusmultichannel.R
 import com.qiscus.qiscusmultichannel.ui.webView.WebViewHelper
 import com.qiscus.qiscusmultichannel.util.Const
 import com.qiscus.sdk.chat.core.data.model.QMessage
-import kotlinx.android.synthetic.main.item_my_reply_mc.view.*
+import android.widget.TextView
+import com.qiscus.qiscusmultichannel.databinding.ItemMyReplyMcBinding
 import org.json.JSONObject
 import java.util.regex.Matcher
 
@@ -25,28 +26,31 @@ import java.util.regex.Matcher
  */
 class ReplyVH(itemView: View) : BaseViewHolder(itemView) {
     private val qiscusAccount = Const.qiscusCore()?.getQiscusAccount()!!
-    private val message = itemView.message
+    private lateinit var message: TextView
+
     override fun bind(comment: QMessage) {
         super.bind(comment)
+        val binding = ItemMyReplyMcBinding.bind(itemView)
+        message = binding.message
         val origin = comment.replyTo
 
-        itemView.origin_sender?.text =
+        binding.originSender.text =
             if (qiscusAccount.id == origin.sender.id) itemView.context.getString(R.string.qiscus_you_mc) else origin.sender.name
 
-        itemView.origin_comment?.text = origin.text
-        itemView.message.text = comment.text
-        itemView.icon.visibility = View.VISIBLE
+        binding.originComment.text = origin.text
+        message.text = comment.text
+        binding.icon.visibility = View.VISIBLE
         setUpLinks()
         when (origin.type) {
             QMessage.Type.TEXT -> {
-                itemView.origin_image.visibility = View.GONE
-                itemView.icon.visibility = View.GONE
+                binding.originImage.visibility = View.GONE
+                binding.icon.visibility = View.GONE
             }
             QMessage.Type.IMAGE -> {
                 val obj = JSONObject(origin.payload)
-                itemView.origin_image.visibility = View.VISIBLE
-                itemView.icon.setImageResource(R.drawable.ic_qiscus_gallery)
-                itemView.origin_comment.text = if (obj.getString("caption") == "") "Image" else obj.getString("caption")
+                binding.originImage.visibility = View.VISIBLE
+                binding.icon.setImageResource(R.drawable.ic_qiscus_gallery)
+                binding.originComment.text = if (obj.getString("caption") == "") "Image" else obj.getString("caption")
                 Nirmana.getInstance().get()
                     .setDefaultRequestOptions(
                         RequestOptions()
@@ -55,18 +59,18 @@ class ReplyVH(itemView: View) : BaseViewHolder(itemView) {
                             .dontAnimate()
                     )
                     .load(origin.attachmentUri)
-                    .into(itemView.origin_image)
+                    .into(binding.originImage)
             }
             QMessage.Type.FILE -> {
-                itemView.origin_image.visibility = View.GONE
-                itemView.icon.visibility = View.VISIBLE
-                itemView.origin_comment.text = origin.attachmentName
-                itemView.icon.setImageResource(R.drawable.ic_qiscus_file_mc)
+                binding.originImage.visibility = View.GONE
+                binding.icon.visibility = View.VISIBLE
+                binding.originComment.text = origin.attachmentName
+                binding.icon.setImageResource(R.drawable.ic_qiscus_file_mc)
             }
             else -> {
-                itemView.origin_image.visibility = View.GONE
-                itemView.icon.visibility = View.GONE
-                itemView.origin_comment.text = origin.text
+                binding.originImage.visibility = View.GONE
+                binding.icon.visibility = View.GONE
+                binding.originComment.text = origin.text
             }
         }
     }

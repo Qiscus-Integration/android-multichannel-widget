@@ -16,7 +16,9 @@ import com.qiscus.qiscusmultichannel.MultichannelWidget
 import com.qiscus.qiscusmultichannel.R
 import com.qiscus.qiscusmultichannel.ui.webView.WebViewHelper
 import com.qiscus.sdk.chat.core.data.model.QMessage
-import kotlinx.android.synthetic.main.item_card_mc.view.*
+import android.widget.Button
+import android.widget.TextView
+import com.qiscus.qiscusmultichannel.databinding.ItemCardMcBinding
 import org.json.JSONObject
 import java.util.regex.Matcher
 
@@ -32,8 +34,10 @@ class CardVH(itemView: View) : BaseViewHolder(itemView) {
     override fun bind(comment: QMessage) {
         super.bind(comment)
         val data = JSONObject(comment.payload)
-        itemView.tv_title.text = data.getString("title")
-        itemView.tv_message.text = data.getString("description")
+        val binding = ItemCardMcBinding.bind(itemView)
+
+        binding.tvTitle.text = data.getString("title")
+        binding.tvMessage.text = data.getString("description")
 
         Nirmana.getInstance().get()
             .setDefaultRequestOptions(
@@ -44,15 +48,15 @@ class CardVH(itemView: View) : BaseViewHolder(itemView) {
                     .transforms(CenterCrop(), RoundedCorners(16))
             )
             .load(data.getString("image"))
-            .into(itemView.image)
-        setUpLinks()
+            .into(binding.image)
+        setUpLinks(binding.tvMessage)
         try {
             val dataButton = JSONObject(data.getJSONArray("buttons")[0].toString())
             val payload = JSONObject(dataButton.get("payload").toString())
             val url = payload.getString("url")
             val type = dataButton.getString("type")
             val postbackText = dataButton.getString("postback_text")
-            itemView.btn_msg.setOnClickListener {
+            binding.btnMsg.setOnClickListener {
                 when (type) {
                     "link" -> WebViewHelper.launchUrl(itemView.context, Uri.parse(url))
                     "postback" -> {
@@ -66,7 +70,7 @@ class CardVH(itemView: View) : BaseViewHolder(itemView) {
                 }
 
             }
-            itemView.btn_msg.text = dataButton.getString("label")
+            binding.btnMsg.text = dataButton.getString("label")
         } catch (e: Exception) {
         }
     }
@@ -84,8 +88,8 @@ class CardVH(itemView: View) : BaseViewHolder(itemView) {
     }
 
     @SuppressLint("DefaultLocale", "RestrictedApi")
-    private fun setUpLinks() {
-        val text = itemView.tv_message.text.toString().toLowerCase()
+    private fun setUpLinks(tvMessage: TextView) {
+        val text = tvMessage.text.toString().toLowerCase()
         val matcher: Matcher = PatternsCompat.AUTOLINK_WEB_URL.matcher(text)
         while (matcher.find()) {
             val start: Int = matcher.start()
@@ -101,12 +105,12 @@ class CardVH(itemView: View) : BaseViewHolder(itemView) {
                     }
                     WebViewHelper.launchUrl(itemView.context, Uri.parse(url))
                 }
-            })
+            }, tvMessage)
         }
     }
 
-    private fun clickify(start: Int, end: Int, listener: ClickSpan.OnClickListener) {
-        val text: CharSequence = itemView.tv_message.text.toString()
+    private fun clickify(start: Int, end: Int, listener: ClickSpan.OnClickListener, tvMessage: TextView) {
+        val text: CharSequence = tvMessage.text.toString()
         val span = ClickSpan(listener)
         if (start == -1) {
             return
@@ -116,7 +120,7 @@ class CardVH(itemView: View) : BaseViewHolder(itemView) {
         } else {
             val s: SpannableString = SpannableString.valueOf(text)
             s.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            itemView.tv_message.text = s
+            tvMessage.text = s
         }
     }
 
