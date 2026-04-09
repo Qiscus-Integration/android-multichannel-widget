@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.0.33-v3] - 0.0.32-v3
+
+### Summary
+This release reverts the edge-to-edge window insets implementation, restoring the original window management behavior across all widget activities.
+
+### Reverted
+- Removed `WindowCompat.setDecorFitsSystemWindows` and `onWindow()` insets listener from `ChatRoomActivity`, `SendImageConfirmationActivity`, `LoadingActivity`, and `WebViewActivity`.
+- Removed transparent `statusBarColor` and `navigationBarColor` from `QiscusWidgetTheme`.
+- Removed `android:windowOptOutEdgeToEdgeEnforcement` attribute from both widget and sample app themes.
+
+### How to upgrade
+- No breaking changes. Simply update the library version to `0.0.33-v3`.
+
+---
+
+For a full list of changes, see the commit history between versions `0.0.33-v3` and `0.0.34-v3`.
+
+
 ## [0.0.32-v3] - 0.0.31-v3
 
 ### Summary
