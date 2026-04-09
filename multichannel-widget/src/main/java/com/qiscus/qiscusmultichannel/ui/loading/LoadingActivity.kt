@@ -3,7 +3,11 @@ package com.qiscus.qiscusmultichannel.ui.loading
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.qiscus.qiscusmultichannel.R
 import com.qiscus.qiscusmultichannel.databinding.ActivityLoadingBinding
 import com.qiscus.qiscusmultichannel.data.model.UserProperties
@@ -48,8 +52,13 @@ class LoadingActivity : AppCompatActivity(), LoadingPresenter.LoadingView {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
+        }
         binding = ActivityLoadingBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        onWindow()
         presenter = LoadingPresenter()
 
         intent?.let {
@@ -73,7 +82,13 @@ class LoadingActivity : AppCompatActivity(), LoadingPresenter.LoadingView {
         presenter.detach()
     }
 
-
+    private fun onWindow() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.container) { v: View, insets: WindowInsetsCompat ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
+    }
 
     override fun onError(message: String) {
         showToast(message)

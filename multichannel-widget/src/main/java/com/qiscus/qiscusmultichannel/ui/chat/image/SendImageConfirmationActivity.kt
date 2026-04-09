@@ -4,7 +4,14 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
+import android.widget.EditText
+import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
 import com.qiscus.nirmana.Nirmana
@@ -38,8 +45,14 @@ class SendImageConfirmationActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
+        }
         binding = ActivitySendImageConfirmationMcBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        
+        onWindow()
 
         val room = intent.getParcelableExtra<QChatRoom>(EXTRA_ROOM)
 
@@ -62,7 +75,20 @@ class SendImageConfirmationActivity : AppCompatActivity() {
         binding.buttonSend.setOnClickListener { confirm() }
     }
 
-
+    private fun onWindow() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.main) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
+            binding.toolbar.setPadding(
+                binding.toolbar.paddingLeft, systemBars.top,
+                binding.toolbar.paddingRight, binding.toolbar.paddingBottom
+            )
+            v.setPadding(
+                systemBars.left, 0, systemBars.right, maxOf(imeInsets.bottom, systemBars.bottom)
+            )
+            WindowInsetsCompat.CONSUMED
+        }
+    }
 
     private fun initPhotos() {
         Nirmana.getInstance().get()

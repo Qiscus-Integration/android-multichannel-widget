@@ -7,7 +7,9 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.qiscus.nirmana.Nirmana
 import com.qiscus.qiscusmultichannel.MultichannelWidget
 import com.qiscus.qiscusmultichannel.MultichannelWidgetConfig
@@ -58,8 +60,14 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
+        }
         binding = ActivityChatRoomMcBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        
+        onWindow()
 
         val room = intent.getParcelableExtra<QChatRoom>(CHATROOM_KEY)
 
@@ -102,7 +110,20 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
         bindRoomData()
     }
 
-
+    private fun onWindow() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.main) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
+            binding.toolbar.setPadding(
+                binding.toolbar.paddingLeft, systemBars.top,
+                binding.toolbar.paddingRight, binding.toolbar.paddingBottom
+            )
+            v.setPadding(
+                systemBars.left, 0, systemBars.right, maxOf(imeInsets.bottom, systemBars.bottom)
+            )
+            WindowInsetsCompat.CONSUMED
+        }
+    }
 
     private fun getChatFragment(): ChatRoomFragment {
         return supportFragmentManager.findFragmentByTag(ChatRoomFragment::class.java.name) as ChatRoomFragment
