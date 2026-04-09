@@ -25,7 +25,7 @@ class SampleApp: MultiDexApplication() {
                 .setHideUIEvent(true)
                 .setHardcodedAvatar("https://d1edrlpyc25xu0.cloudfront.net/cee-8xj32ozyfbnka0arz/image/upload/XBOSht7_hR/bebi.jpeg")
 
-        MultichannelWidget.setup(this, ConstCore.qiscusCore1(), "cee-8xj32ozyfbnka0arz", configMultichannel, "user1")
-        //MultichannelWidget.setup(this, ConstCore.qiscusCore1(), "karm-gzu41e4e4dv9fu3f", configMultichannel, "user1")
+//        MultichannelWidget.setup(this, ConstCore.qiscusCore1(), "cee-8xj32ozyfbnka0arz", configMultichannel, "user1")
+        MultichannelWidget.setup(this, ConstCore.qiscusCore1(), "ramo-29lun8b1ulepsaio", configMultichannel, "user1")
     }
 }
