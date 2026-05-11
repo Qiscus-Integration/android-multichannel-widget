@@ -4,19 +4,27 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
+import android.widget.EditText
+import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
 import com.qiscus.nirmana.Nirmana
 import com.qiscus.qiscusmultichannel.R
+import com.qiscus.qiscusmultichannel.databinding.ActivitySendImageConfirmationMcBinding
 import com.qiscus.sdk.chat.core.data.model.QChatRoom
 import com.qiscus.sdk.chat.core.data.model.QiscusPhoto
-import kotlinx.android.synthetic.main.activity_send_image_confirmation_mc.*
 
 class SendImageConfirmationActivity : AppCompatActivity() {
 
     lateinit var qiscusChatRoom: QChatRoom
     lateinit var qiscusPhoto: QiscusPhoto
+    private lateinit var binding: ActivitySendImageConfirmationMcBinding
 
     companion object {
         val EXTRA_ROOM = "extra_room2"
@@ -37,7 +45,14 @@ class SendImageConfirmationActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_send_image_confirmation_mc)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
+        }
+        binding = ActivitySendImageConfirmationMcBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        
+        onWindow()
 
         val room = intent.getParcelableExtra<QChatRoom>(EXTRA_ROOM)
 
@@ -57,27 +72,40 @@ class SendImageConfirmationActivity : AppCompatActivity() {
             return
         }
 
-        buttonSend.setOnClickListener { confirm() }
+        binding.buttonSend.setOnClickListener { confirm() }
+    }
+
+    private fun onWindow() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.main) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
+            binding.toolbar.setPadding(
+                binding.toolbar.paddingLeft, systemBars.top,
+                binding.toolbar.paddingRight, binding.toolbar.paddingBottom
+            )
+            v.setPadding(
+                systemBars.left, 0, systemBars.right, maxOf(imeInsets.bottom, systemBars.bottom)
+            )
+            WindowInsetsCompat.CONSUMED
+        }
     }
 
     private fun initPhotos() {
         Nirmana.getInstance().get()
-            .setDefaultRequestOptions(
-                RequestOptions()
-                    .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
-            )
             .load(qiscusPhoto.photoFile)
-            .into(ivImage)
+            .apply(
+                RequestOptions()
+                    .diskCacheStrategy(DiskCacheStrategy.NONE)
+                    .skipMemoryCache(true)
+            )
+            .into(binding.ivImage)
     }
 
     private fun confirm() {
-        val data = Intent()
-        data.putExtra(
-            EXTRA_PHOTOS,
-            qiscusPhoto
-        )
-        data.putExtra(EXTRA_CAPTIONS, etCaption.text.toString())
-        setResult(Activity.RESULT_OK, data)
+        val intent = Intent()
+        intent.putExtra(EXTRA_CAPTIONS, binding.etCaption.text.toString())
+        intent.putExtra(EXTRA_PHOTOS, qiscusPhoto)
+        setResult(Activity.RESULT_OK, intent)
         finish()
     }
 }

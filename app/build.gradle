@@ -10,7 +10,7 @@ android {
     defaultConfig {
         applicationId "com.qiscus.integrations.multichannel_sample"
         minSdkVersion 21
-        targetSdkVersion 35
+        targetSdkVersion 36
         versionCode 1
         versionName "1.0"
         multiDexEnabled true

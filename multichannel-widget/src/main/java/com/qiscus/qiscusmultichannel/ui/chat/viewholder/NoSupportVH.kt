@@ -3,7 +3,8 @@ package com.qiscus.qiscusmultichannel.ui.chat.viewholder
 import android.view.View
 import com.qiscus.qiscusmultichannel.R
 import com.qiscus.sdk.chat.core.data.model.QMessage
-import kotlinx.android.synthetic.main.item_message_not_supported_mc.view.*
+import android.widget.TextView
+import com.qiscus.qiscusmultichannel.databinding.ItemMessageNotSupportedMcBinding
 
 /**
  * Created on : 17/02/20
@@ -15,6 +16,7 @@ import kotlinx.android.synthetic.main.item_message_not_supported_mc.view.*
 class NoSupportVH(val view: View) : BaseViewHolder(view) {
     override fun bind(comment: QMessage) {
         super.bind(comment)
-        view.message.text = view.context.getString(R.string.qiscus_type_not_support_mc).toString()
+        val binding = ItemMessageNotSupportedMcBinding.bind(view)
+        binding.message.text = view.context.getString(R.string.qiscus_type_not_support_mc).toString()
     }
 }

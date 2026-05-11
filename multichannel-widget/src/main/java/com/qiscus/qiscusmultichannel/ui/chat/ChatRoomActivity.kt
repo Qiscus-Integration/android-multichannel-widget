@@ -7,19 +7,24 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.qiscus.nirmana.Nirmana
 import com.qiscus.qiscusmultichannel.MultichannelWidget
 import com.qiscus.qiscusmultichannel.MultichannelWidgetConfig
 import com.qiscus.qiscusmultichannel.R
+import com.qiscus.qiscusmultichannel.databinding.ActivityChatRoomMcBinding
 import com.qiscus.qiscusmultichannel.util.Const
 import com.qiscus.sdk.chat.core.data.model.QChatRoom
 import com.qiscus.sdk.chat.core.data.model.QMessage
 import com.qiscus.sdk.chat.core.event.QMessageReceivedEvent
 import com.qiscus.sdk.chat.core.event.QiscusUserStatusEvent
 import com.qiscus.sdk.chat.core.util.QiscusDateUtil
-import kotlinx.android.synthetic.*
-import kotlinx.android.synthetic.main.activity_chat_room_mc.*
-import kotlinx.android.synthetic.main.toolbar_menu_selected_comment_mc.*
+import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.appcompat.widget.Toolbar
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import rx.android.schedulers.AndroidSchedulers
@@ -32,10 +37,12 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
     lateinit var qiscusChatRoom: QChatRoom
     private val users: MutableSet<String> = HashSet()
     private var memberList: String = ""
+    private lateinit var binding: ActivityChatRoomMcBinding
     private  var runnable =  Runnable{
-        tvSubtitle?.text = MultichannelWidget.config.getRoomSubtitle() ?: memberList
+        binding.tvSubtitle.text = MultichannelWidget.config.getRoomSubtitle() ?: memberList
     }
     private var handler = Handler(Looper.getMainLooper())
+
     companion object {
         val CHATROOM_KEY = "chatroom_key"
 
@@ -53,7 +60,14 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_chat_room_mc)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false
+        }
+        binding = ActivityChatRoomMcBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        
+        onWindow()
 
         val room = intent.getParcelableExtra<QChatRoom>(CHATROOM_KEY)
 
@@ -64,7 +78,7 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
             this.qiscusChatRoom = room
         }
 
-        btn_back.setOnClickListener { finish() }
+        binding.btnBack.setOnClickListener { finish() }
 
         supportFragmentManager.beginTransaction()
             .replace(
@@ -77,23 +91,38 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
         if (!EventBus.getDefault().isRegistered(this)) {
             EventBus.getDefault().register(this)
         }
-        btn_action_copy.setOnClickListener { getChatFragment().copyComment() }
-        btn_action_delete.setOnClickListener { getChatFragment().deleteComment() }
-        btn_action_reply.setOnClickListener { getChatFragment().replyComment() }
-        btn_action_reply_cancel.setOnClickListener { getChatFragment().clearSelectedComment() }
+        binding.toolbarSelectedComment.btnActionCopy.setOnClickListener { getChatFragment().copyComment() }
+        binding.toolbarSelectedComment.btnActionDelete.setOnClickListener { getChatFragment().deleteComment() }
+        binding.toolbarSelectedComment.btnActionReply.setOnClickListener { getChatFragment().replyComment() }
+        binding.toolbarSelectedComment.btnActionReplyCancel.setOnClickListener { getChatFragment().clearSelectedComment() }
         setBarInfo()
 
-        tvTitle.text = MultichannelWidget.config.getRoomTitle() ?: qiscusChatRoom.name
+        binding.tvTitle.text = MultichannelWidget.config.getRoomTitle() ?: qiscusChatRoom.name
 
         val avatar = MultichannelWidget.config.getHardcodedAvatar() ?: qiscusChatRoom.avatarUrl
         Nirmana.getInstance().get()
             .load(getAvatar())
-            .into(ivAvatar)
+            .into(binding.ivAvatar)
     }
 
     override fun onResume() {
         super.onResume()
         bindRoomData()
+    }
+
+    private fun onWindow() {
+        ViewCompat.setOnApplyWindowInsetsListener(binding.main) { v, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
+            binding.toolbar.setPadding(
+                binding.toolbar.paddingLeft, systemBars.top,
+                binding.toolbar.paddingRight, binding.toolbar.paddingBottom
+            )
+            v.setPadding(
+                systemBars.left, 0, systemBars.right, maxOf(imeInsets.bottom, systemBars.bottom)
+            )
+            WindowInsetsCompat.CONSUMED
+        }
     }
 
     private fun getChatFragment(): ChatRoomFragment {
@@ -102,22 +131,22 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
 
     override fun onCommentSelected(selectedComment: QMessage) {
         val me = Const.qiscusCore()?.getQiscusAccount()?.getId()
-        if (toolbar_selected_comment.visibility == View.VISIBLE) {
-            toolbar_selected_comment.visibility = View.GONE
+        if (binding.toolbarSelectedComment.root.visibility == View.VISIBLE) {
+            binding.toolbarSelectedComment.root.visibility = View.GONE
             getChatFragment().clearSelectedComment()
         } else {
-            btn_action_delete.visibility =
+            binding.toolbarSelectedComment.btnActionDelete.visibility =
                 if (selectedComment.isMyComment(me)) View.VISIBLE else View.GONE
-            toolbar_selected_comment.visibility = View.VISIBLE
+            binding.toolbarSelectedComment.root.visibility = View.VISIBLE
         }
     }
 
     override fun onClearSelectedComment(status: Boolean) {
-        toolbar_selected_comment.visibility = View.INVISIBLE
+        binding.toolbarSelectedComment.root.visibility = View.INVISIBLE
     }
 
     override fun onUserTyping(email: String?, isTyping: Boolean) {
-        tvSubtitle?.text = if (isTyping) "typing..." else getSubtitle()
+        binding.tvSubtitle.text = if (isTyping) "typing..." else getSubtitle()
 
         if (isTyping) {
             handler.removeCallbacks(runnable)
@@ -144,7 +173,7 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
                     listMember.add(it.name)
                 }
                 this.memberList = listMember.joinToString()
-                tvSubtitle.text = getSubtitle()
+                binding.tvSubtitle.text = getSubtitle()
             }
     }
 
@@ -185,6 +214,5 @@ class ChatRoomActivity : AppCompatActivity(), ChatRoomFragment.CommentSelectedLi
             Const.qiscusCore()?.pusherApi?.unsubscribeUserOnlinePresence(user)
         }
         EventBus.getDefault().unregister(this)
-        clearFindViewByIdCache()
     }
 }
